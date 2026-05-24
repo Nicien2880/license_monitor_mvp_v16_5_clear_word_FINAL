@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ app_name }} · Резервные копии</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body data-can-edit="{{ 'true' if can_edit else 'false' }}" data-can-manage="{{ 'true' if can_manage else 'false' }}">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-mark">LM</div>
+      <div class="brand-text"><strong>License Monitor</strong><span>v15</span></div>
+      <button type="button" class="icon-button sidebar-toggle" data-sidebar-toggle title="Свернуть меню">☰</button>
+    </div>
+    <nav class="side-nav">
+      <a href="/?section=hardware" class="side-link" title="Техподдержка оборудования"><span class="side-icon">🛠</span><span class="side-label"><strong>Техподдержка оборудования</strong><em>Сроки ТП</em></span></a>
+      <a href="/?section=software" class="side-link" title="Лицензии ПО"><span class="side-icon">📦</span><span class="side-label"><strong>Лицензии ПО</strong><em>Сертификаты и лицензии</em></span></a>
+      <a href="/backup-monitor" class="side-link active" title="Резервные копии объектов"><span class="side-icon">🗄</span><span class="side-label"><strong>Резервные копии объектов</strong><em>{{ stats.total }} объектов</em></span></a>
+      <a href="/data-protection" class="side-link" title="Data Protection"><span class="side-icon">🛡</span><span class="side-label"><strong>Data Protection</strong><em>План резервирования</em></span></a>
+    </nav>
+    <div class="side-block">
+      <a href="/history"><span class="side-icon small">🕘</span><span class="side-label">История изменений</span></a>
+      {% if can_admin %}<a href="/admin/users"><span class="side-icon small">U</span><span class="side-label">Пользователи</span></a><a href="/admin/backups"><span class="side-icon small">B</span><span class="side-label">Резервные копии БД</span></a>{% endif %}
+      <a href="/api/backup-monitor/summary"><span class="side-icon small">API</span><span class="side-label">Backup API</span></a>
+      <a href="/metrics"><span class="side-icon small">M</span><span class="side-label">Metrics</span></a>
+    </div>
+  </aside>
+
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="title-block">
+        <button type="button" class="icon-button mobile-sidebar-toggle" data-sidebar-toggle title="Меню">☰</button>
+        <div>
+          <h1>Резервные копии</h1>
+          <p>Визуальный контроль бэкапов серверов и виртуальных машин</p>
+        </div>
+      </div>
+      <div class="top-actions">
+        <span class="user-chip">{{ current_user.username if current_user else "system" }} · {{ current_user.role if current_user else "admin" }}</span>
+        <button type="button" class="button secondary" id="themeToggle">Тема</button>
+        <form method="post" action="/logout" class="logout-form"><button type="submit" class="button secondary">Выйти</button></form>
+      </div>
+    </header>
+
+    <main class="container backup-dashboard">
+      <section class="backup-hero-grid">
+        <div class="backup-kpi primary"><span>Всего объектов</span><strong>{{ stats.total }}</strong><em>Серверы, ВМ, БД и сервисы</em></div>
+        <div class="backup-kpi success"><span>Успешно</span><strong>{{ stats.success }}</strong><em>{{ stats.health }}% покрытия</em></div>
+        <div class="backup-kpi warning"><span>Требуют проверки</span><strong>{{ stats.warning }}</strong><em>Есть замечания</em></div>
+        <div class="backup-kpi failed"><span>Ошибки</span><strong>{{ stats.failed }}</strong><em>Нужно действие</em></div>
+        <div class="backup-kpi running"><span>Выполняется</span><strong>{{ stats.running }}</strong><em>Активные задания</em></div>
+      </section>
+
+      <section class="backup-visual-grid">
+        <div class="panel backup-card">
+          <div class="panel-title"><h2>Статус бэкапов</h2><span class="muted">по всем объектам</span></div>
+          <div class="donut-wrap">
+            <div class="donut" style="--success: {{ stats.health }};"><span>{{ stats.total }}</span><em>всего</em></div>
+            <div class="legend-list">
+              <div><i class="dot success-dot"></i> Успешно <strong>{{ stats.success }}</strong></div>
+              <div><i class="dot warning-dot"></i> Требуют проверки <strong>{{ stats.warning }}</strong></div>
+              <div><i class="dot failed-dot"></i> Ошибки <strong>{{ stats.failed }}</strong></div>
+              <div><i class="dot running-dot"></i> Выполняется <strong>{{ stats.running }}</strong></div>
+            </div>
+          </div>
+        </div>
+        <div class="panel backup-card">
+          <div class="panel-title"><h2>Платформы</h2><span class="muted">успешность по источникам</span></div>
+          <div class="platform-bars">
+            {% for row in platform_stats %}
+            <div class="platform-row"><div><strong>{{ row.platform }}</strong><span>{{ row.success_percent }}%</span></div><div class="bar"><i style="width: {{ row.success_percent }}%"></i></div><em>{{ row.success }}/{{ row.total }}</em></div>
+            {% else %}<p class="muted">Пока нет данных</p>{% endfor %}
+          </div>
+        </div>
+        <div class="panel backup-card">
+          <div class="panel-title"><h2>Календарь проверок</h2><span class="muted">макет за 4 недели</span></div>
+          <div class="backup-heatmap">
+            {% for day in ["Пн","Вт","Ср","Чт","Пт","Сб","Вс"] %}
+            <span class="heat-label">{{ day }}</span>
+            {% for i in range(4) %}
+              {% set mark = 'ok' if (loop.index0 + i) % 9 != 0 else 'bad' %}
+              <i class="heat {{ mark }}"></i>
+            {% endfor %}
+            {% endfor %}
+          </div>
+          <p class="muted">В следующем шаге сюда можно подтянуть реальные события из Veeam/Proxmox/Zabbix.</p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title"><h2>Фильтры</h2><a class="button secondary" href="/backup-monitor" id="resetFilters">Сбросить</a></div>
+        <form method="get" action="/backup-monitor" class="filters" id="filtersForm" data-section="backup-monitor">
+          <input type="search" name="q" placeholder="Поиск: объект, платформа, хранилище, политика" value="{{ selected.q }}">
+          <select name="status"><option value="">Все статусы</option>{% for s in statuses %}<option value="{{ s }}" {% if selected.status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select>
+          <select name="responsible"><option value="">Все ответственные</option>{% for r in responsibles %}<option value="{{ r }}" {% if selected.responsible == r %}selected{% endif %}>{{ r }}</option>{% endfor %}</select>
+          <button type="submit">Применить</button>
+        </form>
+      </section>
+
+      {% if can_edit %}
+      <section class="panel">
+        <div class="panel-title"><h2>Добавить объект резервного копирования</h2></div>
+        <form method="post" action="/backup-monitor" class="form-grid backup-form">
+          <input name="object_name" placeholder="Объект: VM-DC01 / SRV-FS01" required>
+          <select name="object_type"><option value="vm">Виртуальная машина</option><option value="server">Физический сервер</option><option value="database">База данных</option><option value="service">Сервис</option><option value="storage">Хранилище</option></select>
+          <input name="platform" placeholder="Платформа: VMware / Proxmox / Veeam">
+          <label>Последний backup<input type="datetime-local" name="last_backup_at"></label>
+          <label>Следующий backup<input type="datetime-local" name="next_backup_at"></label>
+          <input type="number" name="size_gb" placeholder="Размер, ГБ">
+          <input name="storage" placeholder="Хранилище">
+          <input type="number" name="retention_days" placeholder="Retention, дней">
+          <input type="number" name="duration_min" placeholder="Длительность, мин">
+          <input name="policy_name" placeholder="Политика / задание">
+          <input name="responsible" placeholder="Ответственный">
+          <select name="status"><option value="success">success</option><option value="warning">warning</option><option value="failed">failed</option><option value="running">running</option><option value="unknown">unknown</option></select>
+          <textarea name="comment" placeholder="Комментарий"></textarea>
+          <button type="submit">Добавить</button>
+        </form>
+      </section>
+      {% endif %}
+
+      <section class="panel wide">
+        <div class="panel-title"><h2>Последние резервные копии</h2><span class="muted">Найдено: {{ items|length }}</span></div>
+        <div class="table-wrap">
+          <table class="wide-table sortable-table resizable-table backup-table" data-table-id="backup-monitor">
+            <thead>
+              <tr>
+                <th>№</th><th data-field="object_name">Объект</th><th data-field="object_type">Тип</th><th data-field="platform">Платформа</th><th data-field="last_backup_at" data-input="datetime-local">Последний backup</th><th data-field="next_backup_at" data-input="datetime-local">Следующий</th><th data-field="size_gb" data-input="number">Размер, ГБ</th><th data-field="storage">Хранилище</th><th data-field="retention_days" data-input="number">Retention</th><th data-field="duration_min" data-input="number">Длительность</th><th data-field="policy_name">Политика</th><th data-field="responsible">Ответственный</th><th data-field="status">Статус</th><th data-field="comment" data-input="textarea">Комментарий</th><th data-no-sort="true" data-detail-exclude="true" class="actions-col">Действия</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in items %}
+              <tr class="clickable-row backup-row-{{ item.status }}" data-title="{{ item.object_name }}" data-delete-url="/backup-monitor/{{ item.id }}/delete" data-update-url="/backup-monitor/{{ item.id }}/update">
+                <td data-sort="{{ loop.index }}">{{ loop.index }}</td>
+                <td>{{ item.object_name }}</td><td>{{ item.object_type }}</td><td>{{ item.platform }}</td>
+                <td data-sort="{{ item.last_backup_at.isoformat() if item.last_backup_at else '' }}" data-value="{{ format_dt_for_input(item.last_backup_at) }}">{{ item.last_backup_at.strftime('%d.%m.%Y %H:%M') if item.last_backup_at else '' }}</td>
+                <td data-sort="{{ item.next_backup_at.isoformat() if item.next_backup_at else '' }}" data-value="{{ format_dt_for_input(item.next_backup_at) }}">{{ item.next_backup_at.strftime('%d.%m.%Y %H:%M') if item.next_backup_at else '' }}</td>
+                <td data-sort="{{ item.size_gb or 0 }}">{{ item.size_gb or '' }}</td><td>{{ item.storage or '' }}</td><td data-sort="{{ item.retention_days or 0 }}">{{ item.retention_days or '' }}</td><td data-sort="{{ item.duration_min or 0 }}">{{ item.duration_min or '' }}</td><td>{{ item.policy_name or '' }}</td><td>{{ item.responsible or '' }}</td>
+                <td data-sort="{{ item.status }}"><span class="backup-status {{ item.status }}">{{ item.status }}</span></td><td>{{ item.comment or '' }}</td>
+                <td class="action-cell" data-detail-exclude="true">{% if can_manage %}<form method="post" action="/backup-monitor/{{ item.id }}/delete" onsubmit="return confirm('Удалить объект backup-мониторинга?')"><button class="danger tiny" type="submit">Удалить</button></form>{% endif %}</td>
+              </tr>
+              {% else %}<tr><td colspan="15" class="empty">Пока нет объектов резервного копирования</td></tr>{% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal" id="detailModal" aria-hidden="true">
+    <div class="modal-backdrop" data-modal-close></div>
+    <div class="modal-card">
+      <div class="modal-head"><div><h2 id="modalTitle">Карточка объекта</h2><p class="muted">Данные резервного копирования</p></div><button type="button" class="icon-button" data-modal-close>×</button></div>
+      <div class="detail-grid" id="modalDetails"></div>
+      <div class="modal-actions" id="modalActions"></div>
+    </div>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

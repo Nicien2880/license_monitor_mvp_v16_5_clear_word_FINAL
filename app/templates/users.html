@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Пользователи · {{ app_name }}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <main class="container users-container">
+    <div class="panel-title">
+      <div>
+        <h1>Пользователи</h1>
+        <p class="muted">Управление доступом к License Monitor</p>
+      </div>
+      <div class="top-actions">
+        <a class="button secondary" href="/">Назад</a>
+        <form method="post" action="/logout"><button class="button secondary">Выйти</button></form>
+      </div>
+    </div>
+
+    <section class="panel">
+      <div class="panel-title"><h2>Добавить пользователя</h2></div>
+      <form method="post" action="/admin/users" class="form-grid user-form">
+        <input name="username" placeholder="Логин" required>
+        <input name="password" type="password" placeholder="Пароль" required>
+        <input name="full_name" placeholder="ФИО">
+        <input name="email" placeholder="Email">
+        <select name="role">
+          {% for key, label in roles.items() %}<option value="{{ key }}">{{ label }} / {{ key }}</option>{% endfor %}
+        </select>
+        <label class="checkbox"><input type="checkbox" name="is_active" value="true" checked> Активен</label>
+        <button type="submit">Создать</button>
+      </form>
+    </section>
+
+    <section class="panel wide">
+      <div class="panel-title"><h2>Список пользователей</h2><span class="muted">{{ users|length }} записей</span></div>
+      <div class="table-wrap">
+        <table class="wide-table users-table">
+          <thead><tr><th>ID</th><th>Логин</th><th>ФИО</th><th>Email</th><th>Роль</th><th>Активен</th><th>Новый пароль</th><th>Действия</th></tr></thead>
+          <tbody>
+            {% for user in users %}
+            <tr>
+              <form method="post" action="/admin/users/{{ user.id }}/update">
+                <td>{{ user.id }}</td>
+                <td><strong>{{ user.username }}</strong></td>
+                <td><input name="full_name" value="{{ user.full_name or '' }}"></td>
+                <td><input name="email" value="{{ user.email or '' }}"></td>
+                <td><select name="role">{% for key, label in roles.items() %}<option value="{{ key }}" {% if user.role == key %}selected{% endif %}>{{ label }} / {{ key }}</option>{% endfor %}</select></td>
+                <td><label class="checkbox"><input type="checkbox" name="is_active" value="true" {% if user.is_active %}checked{% endif %}> Да</label></td>
+                <td><input name="password" type="password" placeholder="оставить пустым"></td>
+                <td class="action-cell"><button type="submit" class="tiny">Сохранить</button></td>
+              </form>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

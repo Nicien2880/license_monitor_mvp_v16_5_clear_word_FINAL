@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ app_name }} · Data Protection</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body data-can-edit="{{ 'true' if can_edit else 'false' }}" data-can-manage="{{ 'true' if can_manage else 'false' }}">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-mark">LM</div>
+      <div class="brand-text"><strong>License Monitor</strong><span>v16</span></div>
+      <button type="button" class="icon-button sidebar-toggle" data-sidebar-toggle title="Свернуть меню">☰</button>
+    </div>
+    <nav class="side-nav">
+      <a href="/?section=hardware" class="side-link"><span class="side-icon">🛠</span><span class="side-label"><strong>Техподдержка оборудования</strong><em>Сроки ТП</em></span></a>
+      <a href="/?section=software" class="side-link"><span class="side-icon">📦</span><span class="side-label"><strong>Лицензии ПО</strong><em>Сертификаты и лицензии</em></span></a>
+      <a href="/backup-monitor" class="side-link"><span class="side-icon">🗄</span><span class="side-label"><strong>Резервные копии объектов</strong><em>Backup dashboard</em></span></a>
+      <a href="/data-protection" class="side-link active"><span class="side-icon">🛡</span><span class="side-label"><strong>Data Protection</strong><em>{{ stats.total }} политик</em></span></a>
+    </nav>
+    <div class="side-block">
+      <a href="/history"><span class="side-icon small">🕘</span><span class="side-label">История изменений</span></a>
+      {% if can_admin %}<a href="/admin/users"><span class="side-icon small">U</span><span class="side-label">Пользователи</span></a><a href="/admin/backups"><span class="side-icon small">B</span><span class="side-label">Резервные копии БД</span></a>{% endif %}
+      <a href="/api/data-protection/summary"><span class="side-icon small">API</span><span class="side-label">DP API</span></a>
+      <a href="/metrics"><span class="side-icon small">M</span><span class="side-label">Metrics</span></a>
+    </div>
+  </aside>
+
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="title-block">
+        <button type="button" class="icon-button mobile-sidebar-toggle" data-sidebar-toggle title="Меню">☰</button>
+        <div>
+          <h1>Data Protection</h1>
+          <p>План резервирования информационных систем и группировка по типам backup</p>
+        </div>
+      </div>
+      <div class="top-actions">
+        <span class="user-chip">{{ current_user.username if current_user else "system" }} · {{ current_user.role if current_user else "admin" }}</span>
+        <button type="button" class="button secondary" id="themeToggle">Тема</button>
+        {% if can_manage %}<a class="button secondary" href="/data-protection/export.xlsx">Экспорт Excel</a>{% endif %}
+        <form method="post" action="/logout" class="logout-form"><button type="submit" class="button secondary">Выйти</button></form>
+      </div>
+    </header>
+
+    <main class="container backup-dashboard dp-dashboard">
+      <section class="backup-hero-grid dp-hero-grid">
+        <div class="backup-kpi primary"><span>Всего систем</span><strong>{{ stats.total }}</strong><em>в плане резервирования</em></div>
+        <div class="backup-kpi success"><span>Общий объём</span><strong>{{ stats.volume_label }}</strong><em>{{ stats.volume_gb }} ГБ суммарно</em></div>
+        <div class="backup-kpi running"><span>Full backup</span><strong>{{ stats.full }}</strong><em>строк с Full в политике</em></div>
+        <div class="backup-kpi warning"><span>Incremental</span><strong>{{ stats.incremental }}</strong><em>строк с Incr/Incremental</em></div>
+        <div class="backup-kpi failed"><span>Без ответственного</span><strong>{{ stats.no_responsible }}</strong><em>нужно заполнить владельца</em></div>
+      </section>
+
+      <section class="backup-visual-grid dp-visual-grid">
+        <div class="panel backup-card">
+          <div class="panel-title"><h2>Типы резервирования</h2><span class="muted">количество систем</span></div>
+          <div class="dp-type-list">
+            {% for row in type_stats %}
+            <div class="dp-type-row {{ row.type }}">
+              <div><strong>{{ row.label }}</strong><span>{{ row.count }} систем</span></div>
+              <em>{{ row.volume_label }}</em>
+            </div>
+            {% else %}<p class="muted">Пока нет данных</p>{% endfor %}
+          </div>
+        </div>
+        <div class="panel backup-card">
+          <div class="panel-title"><h2>Объём по типам</h2><span class="muted">в ГБ/ТБ</span></div>
+          <div class="platform-bars">
+            {% set max_volume = (type_stats|map(attribute='volume_gb')|max) if type_stats else 0 %}
+            {% for row in type_stats %}
+            <div class="platform-row"><div><strong>{{ row.label }}</strong><span>{{ row.volume_label }}</span></div><div class="bar"><i style="width: {{ (row.volume_gb / max_volume * 100) if max_volume else 0 }}%"></i></div><em>{{ row.count }}</em></div>
+            {% else %}<p class="muted">Пока нет данных</p>{% endfor %}
+          </div>
+        </div>
+        <div class="panel backup-card">
+          <div class="panel-title"><h2>Импорт данных</h2><span class="muted">Word / Excel</span></div>
+          <p class="muted">Можно импортировать таблицу напрямую из Word (.docx). Поддерживаются группы: Filesystem, Internal Database, MS SQL Server, Virtual Environment.</p>
+          {% if can_manage %}
+          <form method="post" action="/data-protection/import.docx" enctype="multipart/form-data" class="inline-import">
+            <input type="file" name="file" accept=".docx" required>
+            <button type="submit">Импорт Word</button>
+          </form>
+          <form method="post" action="/data-protection/import.xlsx" enctype="multipart/form-data" class="inline-import">
+            <input type="file" name="file" accept=".xlsx,.xlsm" required>
+            <button type="submit">Импорт Excel</button>
+          </form>
+          {% endif %}
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title"><h2>Фильтры</h2><a class="button secondary" href="/data-protection" id="resetFilters">Сбросить</a></div>
+        <form method="get" action="/data-protection" class="filters dp-filters" id="filtersForm" data-section="data-protection">
+          <input type="search" name="q" placeholder="Поиск: ИС, информация, периодичность, примечания" value="{{ selected.q }}">
+          <select name="backup_type"><option value="">Все типы backup</option>{% for key, label in backup_types.items() %}<option value="{{ key }}" {% if selected.backup_type == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+          <select name="responsible"><option value="">Все ответственные</option>{% for r in responsibles %}<option value="{{ r }}" {% if selected.responsible == r %}selected{% endif %}>{{ r }}</option>{% endfor %}</select>
+          <button type="submit">Применить</button>
+        </form>
+      </section>
+
+      {% if can_edit %}
+      <section class="panel">
+        <div class="panel-title"><h2>Добавить политику резервирования</h2></div>
+        <form method="post" action="/data-protection" class="form-grid dp-form">
+          <input type="number" name="row_number" placeholder="№">
+          <select name="backup_type">{% for key, label in backup_types.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select>
+          <input name="system_name" placeholder="Наименование информационной системы" required>
+          <textarea name="reserved_information" placeholder="Информация, подлежащая резервированию"></textarea>
+          <input name="max_volume_gb" placeholder="Макс. объём: 80 GB / 8TB / 170">
+          <textarea name="procedure_frequency" placeholder="Периодичность: Full — по средам... / Incr — 2 раза в день..."></textarea>
+          <input name="retention_period" placeholder="Срок хранения: 30 дней / 2 недели">
+          <input name="responsible_person" placeholder="Ответственный работник">
+          <textarea name="notes" placeholder="Примечания"></textarea>
+          <button type="submit">Добавить</button>
+        </form>
+      </section>
+      {% endif %}
+
+      <section class="panel wide">
+        <div class="panel-title"><h2>Политики резервирования</h2><span class="muted">Найдено: {{ items|length }}</span>{% if can_manage %}<form method="post" action="/data-protection/clear" onsubmit="return confirm('Полностью очистить таблицу политик резервирования? Действие необратимо.')" class="logout-form"><button type="submit" class="danger tiny">Очистить таблицу</button></form>{% endif %}</div>
+        <div class="table-wrap">
+          <table class="wide-table sortable-table resizable-table dp-table" data-table-id="data-protection-plan">
+            <thead>
+              <tr>
+                <th data-field="row_number" data-input="number">№</th>
+                <th data-field="backup_type">Тип backup</th>
+                <th data-field="system_name">Наименование информационной системы</th>
+                <th data-field="reserved_information" data-input="textarea">Информация, подлежащая резервированию</th>
+                <th data-field="max_volume_gb">Максимальный объём</th>
+                <th data-field="procedure_frequency" data-input="textarea">Периодичность проведения процедуры</th>
+                <th data-field="retention_period">Срок хранения информации</th>
+                <th data-field="notes" data-input="textarea">Примечания</th>
+                <th data-field="responsible_person">Ответственный работник</th>
+                <th data-no-sort="true" data-detail-exclude="true" class="actions-col">Действия</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for group in groups %}
+              <tr class="dp-group-row {{ group.type }}" data-detail-exclude="true">
+                <td colspan="10"><strong>{{ group.label }}</strong><span>{{ group.count }} систем · {{ group.volume_label }}</span></td>
+              </tr>
+              {% for item in group["items"] %}
+              <tr class="clickable-row" data-title="{{ item.system_name }}" data-delete-url="/data-protection/{{ item.id }}/delete" data-update-url="/data-protection/{{ item.id }}/update">
+                <td data-sort="{{ item.row_number or 999999 }}">{{ item.row_number or '' }}</td>
+                <td data-sort="{{ item.backup_type }}" data-value="{{ item.backup_type }}">{{ backup_types.get(item.backup_type, item.backup_type) }}</td>
+                <td>{{ item.system_name }}</td>
+                <td>{{ item.reserved_information or '' }}</td>
+                <td data-sort="{{ item.max_volume_gb or 0 }}" data-value="{{ item.max_volume_gb or '' }}">{{ format_volume(item.max_volume_gb) }}</td>
+                <td>{{ item.procedure_frequency or '' }}</td>
+                <td>{{ item.retention_period or '' }}</td>
+                <td>{{ item.notes or '' }}</td>
+                <td>{{ item.responsible_person or '' }}</td>
+                <td class="action-cell" data-detail-exclude="true">{% if can_manage %}<form method="post" action="/data-protection/{{ item.id }}/delete" onsubmit="return confirm('Удалить политику резервирования?')"><button class="danger tiny" type="submit">Удалить</button></form>{% endif %}</td>
+              </tr>
+              {% endfor %}
+              {% else %}<tr><td colspan="10" class="empty">Пока нет политик резервирования</td></tr>{% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal" id="detailModal" aria-hidden="true">
+    <div class="modal-backdrop" data-modal-close></div>
+    <div class="modal-card">
+      <div class="modal-head"><div><h2 id="modalTitle">Карточка политики</h2><p class="muted">План резервирования информационной системы</p></div><button type="button" class="icon-button" data-modal-close>×</button></div>
+      <div class="detail-grid" id="modalDetails"></div>
+      <div class="modal-actions" id="modalActions"></div>
+    </div>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>История — {{ app_name }}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="topbar"><div><h1>История изменений</h1><p>Последние операции в реестре</p></div><nav><a href="/">Назад</a></nav></header>
+<main class="container">
+  <section class="panel wide">
+    <table>
+      <thead><tr><th>Время</th><th>Раздел</th><th>ID</th><th>Действие</th><th>Описание</th><th>Кто</th></tr></thead>
+      <tbody>
+      {% for row in history %}
+        <tr><td>{{ row.created_at }}</td><td>{{ row.section }}</td><td>{{ row.record_id or '' }}</td><td>{{ row.action }}</td><td>{{ row.description or '' }}</td><td>{{ row.actor }}</td></tr>
+      {% else %}
+        <tr><td colspan="6" class="empty">История пока пустая</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</main>
+</body>
+</html>

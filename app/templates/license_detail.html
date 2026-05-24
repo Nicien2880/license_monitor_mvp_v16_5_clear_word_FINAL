@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ru">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{{ item.product_name }}</title><link rel="stylesheet" href="/static/style.css"></head>
+<body>
+<header class="topbar"><div><h1>{{ item.product_name }}</h1><p>Карточка лицензии: детали, редактирование и история</p></div><nav><a href="/">Реестр</a><a href="/history">История</a></nav></header>
+<main class="container">
+  <section class="stats-grid">
+    <div class="stat"><span>Статус</span><strong>{{ item.status }}</strong></div>
+    <div class="stat critical"><span>Осталось дней</span><strong>{{ item.days_left(today) }}</strong></div>
+    <div class="stat"><span>Категория</span><strong>{{ item.category }}</strong></div>
+    <div class="stat"><span>Источник</span><strong>{{ item.source }}</strong></div>
+  </section>
+  <section class="grid-2">
+    <div class="panel">
+      <div class="panel-title"><h2>Редактирование</h2></div>
+      <form method="post" action="/licenses/{{ item.id }}/update" class="form-grid">
+        <input required name="product_name" value="{{ item.product_name }}" placeholder="Продукт *">
+        <input name="license_type" value="{{ item.license_type }}" placeholder="Тип">
+        <select name="category">{% for c in categories %}<option value="{{ c }}" {% if item.category == c %}selected{% endif %}>{{ c }}</option>{% endfor %}</select>
+        <input name="target_system" value="{{ item.target_system }}" placeholder="Система / сервер">
+        <input name="owner_name" value="{{ item.owner_name }}" placeholder="Ответственный">
+        <input name="vendor_name" value="{{ item.vendor_name }}" placeholder="Поставщик">
+        <label>Начало <input type="date" name="start_date" value="{{ item.start_date or '' }}"></label>
+        <label>Окончание * <input required type="date" name="end_date" value="{{ item.end_date }}"></label>
+        <input type="number" name="warning_days" value="{{ item.warning_days }}" min="1">
+        <input name="contract_number" value="{{ item.contract_number or '' }}" placeholder="Договор / номер">
+        <input name="document_url" value="{{ item.document_url or '' }}" placeholder="Ссылка на документ">
+        <input name="cost" value="{{ item.cost or '' }}" placeholder="Стоимость">
+        <input name="currency" value="{{ item.currency or 'RUB' }}" placeholder="Валюта">
+        <select name="source">{% for s in sources %}<option value="{{ s }}" {% if item.source == s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select>
+        <label class="checkbox"><input type="checkbox" name="auto_renew" value="true" {% if item.auto_renew %}checked{% endif %}> Автопродление</label>
+        <textarea name="comment" placeholder="Комментарий">{{ item.comment or '' }}</textarea>
+        <button type="submit">Сохранить</button>
+      </form>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><h2>Паспорт записи</h2></div>
+      <dl class="details">
+        <dt>Объект</dt><dd>{{ item.target_system }}</dd>
+        <dt>Ответственный</dt><dd>{{ item.owner_name }}</dd>
+        <dt>Поставщик</dt><dd>{{ item.vendor_name }}</dd>
+        <dt>Договор</dt><dd>{{ item.contract_number or '-' }}</dd>
+        <dt>Документ</dt><dd>{% if item.document_url %}<a href="{{ item.document_url }}">открыть</a>{% else %}-{% endif %}</dd>
+        <dt>Стоимость</dt><dd>{{ item.cost or '-' }} {{ item.currency or '' }}</dd>
+        <dt>Автопродление</dt><dd>{{ 'да' if item.auto_renew else 'нет' }}</dd>
+        <dt>Комментарий</dt><dd>{{ item.comment or '-' }}</dd>
+      </dl>
+    </div>
+  </section>
+  <section class="panel wide">
+    <div class="panel-title"><h2>История изменений</h2></div>
+    <table><thead><tr><th>Дата</th><th>Действие</th><th>Поле</th><th>Было</th><th>Стало</th><th>Кто</th></tr></thead><tbody>
+    {% for h in item.history|sort(attribute='created_at', reverse=True) %}<tr><td>{{ h.created_at }}</td><td>{{ h.action }}</td><td>{{ h.field_name or '-' }}</td><td>{{ h.old_value or '-' }}</td><td>{{ h.new_value or '-' }}</td><td>{{ h.actor }}</td></tr>{% else %}<tr><td colspan="6" class="empty">Истории пока нет</td></tr>{% endfor %}
+    </tbody></table>
+  </section>
+</main>
+</body></html>

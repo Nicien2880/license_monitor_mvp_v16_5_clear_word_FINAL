@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Резервные копии · {{ app_name }}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <main class="container users-container">
+    <div class="panel-title">
+      <div>
+        <h1>Резервные копии базы</h1>
+        <p class="muted">Создание и скачивание копий SQLite-базы License Monitor</p>
+      </div>
+      <div class="top-actions">
+        <a class="button secondary" href="/">Назад</a>
+        <form method="post" action="/logout"><button class="button secondary">Выйти</button></form>
+      </div>
+    </div>
+
+    <section class="panel backup-panel">
+      <div class="backup-summary">
+        <div>
+          <span class="muted">Текущая база</span>
+          <strong>{{ database_path }}</strong>
+        </div>
+        <div>
+          <span class="muted">Папка резервных копий</span>
+          <strong>{{ backup_dir }}</strong>
+        </div>
+      </div>
+      <form method="post" action="/admin/backups/create" onsubmit="return confirm('Создать резервную копию текущей базы?')">
+        <button type="submit">Создать резервную копию</button>
+      </form>
+      <p class="muted">Копия создаётся штатным SQLite backup API, поэтому её можно делать без остановки приложения.</p>
+    </section>
+
+    <section class="panel wide">
+      <div class="panel-title"><h2>Доступные копии</h2><span class="muted">Всего: {{ backups|length }}</span></div>
+      <div class="table-wrap">
+        <table class="wide-table sortable-table">
+          <thead>
+            <tr><th>Файл</th><th>Создана</th><th>Размер</th><th class="actions-col">Действия</th></tr>
+          </thead>
+          <tbody>
+          {% for backup in backups %}
+            <tr>
+              <td><strong>{{ backup.name }}</strong></td>
+              <td>{{ backup.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+              <td>{{ backup.size_mb }} MB</td>
+              <td class="action-cell backup-actions">
+                <a class="button tiny" href="/admin/backups/{{ backup.name }}/download">Скачать</a>
+                <form method="post" action="/admin/backups/{{ backup.name }}/delete" onsubmit="return confirm('Удалить резервную копию {{ backup.name }}?')">
+                  <button class="danger tiny" type="submit">Удалить</button>
+                </form>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="4" class="empty">Резервных копий пока нет</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>

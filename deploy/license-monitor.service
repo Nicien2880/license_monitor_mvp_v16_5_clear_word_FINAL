@@ -1,0 +1,16 @@
+[Unit]
+Description=License Monitor FastAPI Service
+After=network.target
+
+[Service]
+Type=simple
+User=license-monitor
+Group=license-monitor
+WorkingDirectory=/opt/license-monitor
+EnvironmentFile=/opt/license-monitor/.env
+ExecStart=/usr/bin/python3 -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

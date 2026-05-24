@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ app_name }}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body data-can-edit="{{ 'true' if can_edit else 'false' }}" data-can-manage="{{ 'true' if can_manage else 'false' }}">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-mark">LM</div>
+      <div class="brand-text">
+        <strong>License Monitor</strong>
+      </div>
+      <button type="button" class="icon-button sidebar-toggle" data-sidebar-toggle title="Свернуть меню">☰</button>
+    </div>
+
+    <nav class="side-nav">
+      <a href="/?section=hardware" class="side-link {% if section == 'hardware' %}active{% endif %}" title="Техподдержка оборудования">
+        <span class="side-icon">🛠</span>
+        <span class="side-label">
+          <strong>Техподдержка оборудования</strong>
+          <em>{{ global_stats.hardware.total }} записей</em>
+        </span>
+      </a>
+      <a href="/?section=software" class="side-link {% if section == 'software' %}active{% endif %}" title="Лицензии ПО">
+        <span class="side-icon">📦</span>
+        <span class="side-label">
+          <strong>Лицензии ПО</strong>
+          <em>{{ global_stats.software.total }} записей</em>
+        </span>
+      </a>
+      <a href="/backup-monitor" class="side-link" title="Резервные копии объектов">
+        <span class="side-icon">🗄</span>
+        <span class="side-label">
+          <strong>Резервные копии объектов</strong>
+          <em>Backup dashboard</em>
+        </span>
+      </a>
+      <a href="/data-protection" class="side-link" title="Data Protection">
+        <span class="side-icon">🛡</span>
+        <span class="side-label">
+          <strong>Data Protection</strong>
+          <em>План резервирования</em>
+        </span>
+      </a>
+    </nav>
+
+    <div class="side-block">
+      <a href="/history"><span class="side-icon small">🕘</span><span class="side-label">История изменений</span></a>
+      {% if can_admin %}<a href="/admin/users"><span class="side-icon small">U</span><span class="side-label">Пользователи</span></a><a href="/admin/backups"><span class="side-icon small">B</span><span class="side-label">Резервные копии</span></a>{% endif %}
+      <a href="/api/monitoring/summary"><span class="side-icon small">API</span><span class="side-label">API summary</span></a>
+      <a href="/metrics"><span class="side-icon small">M</span><span class="side-label">Metrics</span></a>
+    </div>
+  </aside>
+
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="title-block">
+        <button type="button" class="icon-button mobile-sidebar-toggle" data-sidebar-toggle title="Меню">☰</button>
+        <div>
+          <h1>{% if section == 'hardware' %}Техподдержка оборудования{% else %}Лицензии ПО{% endif %}</h1>
+          <p>{% if section == 'hardware' %}Контроль сроков технической поддержки оборудования{% else %}Контроль сроков сертификатов и лицензий программного обеспечения{% endif %}</p>
+        </div>
+      </div>
+      <div class="top-actions">
+        <span class="user-chip">{{ current_user.username if current_user else "system" }} · {{ current_user.role if current_user else "admin" }}</span>
+        <button type="button" class="button secondary" id="themeToggle">Тема</button>
+        {% if can_manage %}<a class="button secondary" href="/export.xlsx?section={{ section }}">Экспорт Excel</a>{% endif %}
+        <form method="post" action="/logout" class="logout-form"><button type="submit" class="button secondary">Выйти</button></form>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="stats-grid">
+        <div class="stat"><span>Всего</span><strong>{{ stats.total }}</strong></div>
+        <div class="stat warning"><span>31–60 дней</span><strong>{{ stats.warning }}</strong></div>
+        <div class="stat critical"><span>8–30 дней</span><strong>{{ stats.critical }}</strong></div>
+        <div class="stat urgent"><span>≤ 7 дней</span><strong>{{ stats.urgent }}</strong></div>
+        <div class="stat expired"><span>Просрочено</span><strong>{{ stats.expired }}</strong></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>Фильтры</h2>
+          <a class="button secondary" href="/?section={{ section }}" id="resetFilters">Сбросить</a>
+        </div>
+        <form method="get" action="/" class="filters" id="filtersForm" data-section="{{ section }}">
+          <input type="hidden" name="section" value="{{ section }}">
+          <input type="search" name="q" placeholder="Поиск по реестру" value="{{ selected.q }}">
+          <select name="status">
+            <option value="">Все статусы</option>
+            {% for s in statuses %}<option value="{{ s }}" {% if selected.status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+          </select>
+          <select name="responsible">
+            <option value="">Все ответственные</option>
+            {% for r in responsibles %}<option value="{{ r }}" {% if selected.responsible == r %}selected{% endif %}>{{ r }}</option>{% endfor %}
+          </select>
+          <button type="submit">Применить</button>
+        </form>
+      </section>
+
+      {% if can_edit %}
+      {% if section == 'hardware' %}
+      <section class="panel">
+        <div class="panel-title"><h2>Добавить запись</h2></div>
+        <form method="post" action="/hardware" class="form-grid hardware-form">
+          <input name="dzo" placeholder="ДЗО">
+          <input name="serial_number" placeholder="Серийный номер">
+          <input name="equipment_model" placeholder="Модель оборудования">
+          <input type="number" name="delivery_year" placeholder="Год поставки">
+          <label>Текущее состояние ТП / дата окончания *<input required type="date" name="support_end_date"></label>
+          <input name="purchase_period" placeholder="Срок на который закупается ТП">
+          <input name="contract_number" placeholder="Договор">
+          <input name="contractor" placeholder="Контрагент">
+          <input name="responsible" placeholder="Ответственный">
+          <label class="checkbox"><input type="checkbox" name="auto_renewal" value="true"> Автопродление</label>
+          <textarea name="comment" placeholder="Комментарий"></textarea>
+          <button type="submit">Добавить</button>
+        </form>
+      </section>
+      {% else %}
+      <section class="panel">
+        <div class="panel-title"><h2>Добавить запись</h2></div>
+        <form method="post" action="/software" class="form-grid software-form">
+          <input name="location" placeholder="Локация">
+          <input name="code" placeholder="Код">
+          <input type="number" name="quantity" value="1" min="1" placeholder="Кол-во">
+          <label>Дата начала сертификата<input type="date" name="cert_start_date"></label>
+          <label>Дата окончания сертификата *<input required type="date" name="cert_end_date"></label>
+          <input name="certificate_number" placeholder="Номер сертификата">
+          <input name="contract_number" placeholder="Номер договора">
+          <input name="contractor" placeholder="Контрагент">
+          <input name="responsible" placeholder="Ответственный">
+          <textarea name="comment" placeholder="Комментарий"></textarea>
+          <button type="submit">Добавить</button>
+        </form>
+      </section>
+      {% endif %}
+      {% endif %}
+
+      {% if can_manage %}
+      <section class="panel">
+        <div class="panel-title"><h2>Excel</h2></div>
+        <div class="excel-actions horizontal">
+          <a class="button" href="/export.xlsx?section={{ section }}">Выгрузить в Excel</a>
+          <form method="post" action="/import.xlsx" enctype="multipart/form-data">
+            <input type="hidden" name="section" value="{{ section }}">
+            <input type="file" name="file" accept=".xlsx,.xlsm" required>
+            <button type="submit">Загрузить Excel</button>
+          </form>
+        </div>
+        <p class="muted">Импорт добавляет строки, существующие записи не удаляет. Для корректного импорта используй выгрузку Excel как шаблон.</p>
+      </section>
+      {% endif %}
+
+      <section class="panel wide">
+        <div class="panel-title"><h2>{% if section == 'hardware' %}Техподдержка оборудования{% else %}Лицензии ПО{% endif %}</h2><span class="muted">Найдено: {{ items|length }}</span></div>
+        <div class="table-wrap">
+          {% if section == 'hardware' %}
+          <table class="wide-table sortable-table resizable-table" data-table-id="{{ section }}">
+            <thead>
+              <tr>
+                <th>№</th><th data-field="dzo">ДЗО</th><th data-field="serial_number">Серийный номер</th><th data-field="equipment_model">Модель оборудования</th><th data-field="delivery_year" data-input="number">Год поставки</th><th data-field="support_end_date" data-input="date">Текущее состояние ТП<br>дата окончания</th><th data-field="purchase_period">Срок закупки ТП</th><th data-field="contract_number">Договор</th><th data-field="contractor">Контрагент</th><th data-field="responsible">Ответственный</th><th data-field="auto_renewal" data-input="checkbox">Автопродление</th><th data-field="comment" data-input="textarea">Комментарий</th><th>Осталось дней</th><th>Статус</th><th data-no-sort="true" data-detail-exclude="true" class="actions-col">Действия</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in items %}
+              {% set days = item.days_left(today) %}
+              <tr class="row-{{ item.status }} clickable-row" data-title="{{ item.equipment_model }} / {{ item.serial_number }}" data-delete-url="/hardware/{{ item.id }}/delete" data-update-url="/hardware/{{ item.id }}/update">
+                <td data-sort="{{ loop.index }}">{{ loop.index }}</td><td>{{ item.dzo }}</td><td>{{ item.serial_number }}</td><td>{{ item.equipment_model }}</td><td data-sort="{{ item.delivery_year or 0 }}">{{ item.delivery_year or '' }}</td><td data-sort="{{ item.support_end_date.isoformat() }}">{{ item.support_end_date }}</td><td>{{ item.purchase_period or '' }}</td><td>{{ item.contract_number or '' }}</td><td>{{ item.contractor or '' }}</td><td>{{ item.responsible or '' }}</td><td data-value="{{ 'true' if item.auto_renewal else 'false' }}">{{ 'да' if item.auto_renewal else 'нет' }}</td><td>{{ item.comment or '' }}</td><td data-sort="{{ days }}"><strong>{{ days }}</strong></td><td data-sort="{{ item.status }}"><span class="badge {{ item.status }}">{{ item.status }}</span></td>
+                <td class="action-cell">{% if can_manage %}<form method="post" action="/hardware/{{ item.id }}/delete" onsubmit="return confirm('Удалить запись?')"><button class="danger tiny" type="submit">Удалить</button></form>{% else %}<span class="muted">—</span>{% endif %}</td>
+              </tr>
+              {% else %}<tr><td colspan="15" class="empty">Записей нет</td></tr>{% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <table class="wide-table sortable-table resizable-table" data-table-id="{{ section }}">
+            <thead>
+              <tr>
+                <th>№</th><th data-field="location">Локация</th><th data-field="code">Код</th><th data-field="quantity" data-input="number">Кол-во</th><th data-field="cert_start_date" data-input="date">Дата начала сертификата</th><th data-field="cert_end_date" data-input="date">Дата окончания сертификата</th><th data-field="certificate_number">Номер сертификата</th><th data-field="comment" data-input="textarea">Комментарий</th><th data-field="contract_number">Номер договора</th><th data-field="contractor">Контрагент</th><th data-field="responsible">Ответственный</th><th>Осталось дней</th><th>Статус</th><th data-no-sort="true" data-detail-exclude="true" class="actions-col">Действия</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in items %}
+              {% set days = item.days_left(today) %}
+              <tr class="row-{{ item.status }} clickable-row" data-title="{{ item.code }}" data-delete-url="/software/{{ item.id }}/delete" data-update-url="/software/{{ item.id }}/update">
+                <td data-sort="{{ loop.index }}">{{ loop.index }}</td><td>{{ item.location or '' }}</td><td>{{ item.code }}</td><td data-sort="{{ item.quantity }}">{{ item.quantity }}</td><td data-sort="{{ item.cert_start_date.isoformat() if item.cert_start_date else '' }}">{{ item.cert_start_date or '' }}</td><td data-sort="{{ item.cert_end_date.isoformat() }}">{{ item.cert_end_date }}</td><td>{{ item.certificate_number or '' }}</td><td>{{ item.comment or '' }}</td><td>{{ item.contract_number or '' }}</td><td>{{ item.contractor or '' }}</td><td>{{ item.responsible or '' }}</td><td data-sort="{{ days }}"><strong>{{ days }}</strong></td><td data-sort="{{ item.status }}"><span class="badge {{ item.status }}">{{ item.status }}</span></td>
+                <td class="action-cell">{% if can_manage %}<form method="post" action="/software/{{ item.id }}/delete" onsubmit="return confirm('Удалить запись?')"><button class="danger tiny" type="submit">Удалить</button></form>{% else %}<span class="muted">—</span>{% endif %}</td>
+              </tr>
+              {% else %}<tr><td colspan="14" class="empty">Записей нет</td></tr>{% endfor %}
+            </tbody>
+          </table>
+          {% endif %}
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal" id="detailModal" aria-hidden="true">
+    <div class="modal-backdrop" data-modal-close></div>
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <h2 id="modalTitle">Карточка объекта</h2>
+          <p class="muted">Просмотр и редактирование выбранной записи</p>
+        </div>
+        <button type="button" class="icon-button" data-modal-close>×</button>
+      </div>
+      <div class="detail-grid" id="modalDetails"></div>
+      <div class="modal-actions" id="modalActions"></div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
